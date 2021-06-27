@@ -1,7 +1,14 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+use pyo3::prelude::*;
+
+// Modules
+mod ssh;
+
+use ssh::*;
+
+#[pymodule]
+/// An SSH library for Python; written in Rust.
+fn russh(_: Python, m: &PyModule) -> PyResult<()> {
+	m.add_class::<Conn>()?;
+
+	Ok(())
 }

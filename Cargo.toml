@@ -2,7 +2,7 @@
 authors = ["Nikhil Prabhu <nikhilprabhu00@gmail>"]
 edition = "2018"
 name = "russh"
-version = "0.1.0"
+version = "0.2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,3 +11,8 @@ crate-type = ["cdylib"]
 name = "russh"
 
 [dependencies]
+ssh2 = "0.9.1"
+
+[dependencies.pyo3]
+features = ["extension-module"]
+version = "0.13.2"
