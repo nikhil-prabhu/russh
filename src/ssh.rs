@@ -3,6 +3,8 @@ use crate::helpers::get_username;
 
 use pyo3::prelude::*;
 use ssh2::Session;
+use std::collections::HashMap;
+use std::fmt;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -23,6 +25,16 @@ pub struct ClientConfig {
 	auth: String,
 }
 
+impl fmt::Display for ClientConfig {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(
+			f,
+			"ClientConfig(addr={}, port={}, user={}, auth={})",
+			self.addr, self.port, self.user, self.auth,
+		)
+	}
+}
+
 #[pyclass]
 #[derive(Clone)]
 /// Represents an SSH connection client.
@@ -34,6 +46,12 @@ pub struct ClientConfig {
 pub struct Client {
 	config: ClientConfig,
 	session: ssh2::Session,
+}
+
+impl fmt::Display for Client {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "Client(config={})", self.config)
+	}
 }
 
 #[pymethods]
@@ -68,6 +86,24 @@ impl ClientConfig {
 			user: some_user,
 			auth,
 		}
+	}
+
+	/// Returns the client configuration object as a string.
+	pub fn to_string(&self) -> PyResult<String> {
+		Ok(format!("{}", self))
+	}
+
+	// TODO: There may be a better way to do this.
+	/// Returns the client configuration object as a dictionary.
+	pub fn to_dict(&self) -> PyResult<HashMap<&'static str, String>> {
+		let mut conf_map: HashMap<&'static str, String> = HashMap::new();
+
+		conf_map.insert("addr", self.addr.clone());
+		conf_map.insert("port", self.port.to_string().clone());
+		conf_map.insert("user", self.user.clone());
+		conf_map.insert("auth", self.auth.clone());
+
+		Ok(conf_map)
 	}
 }
 
@@ -106,5 +142,20 @@ impl Client {
 		assert!(session.authenticated());
 
 		Self { config, session }
+	}
+
+	/// Returns the client object as a string.
+	pub fn to_string(&self) -> PyResult<String> {
+		Ok(format!("{}", self))
+	}
+
+	// TODO: There may be a better way to do this.
+	/// Returns the client object as a dictionary.
+	pub fn to_dict(&self) -> PyResult<HashMap<&'static str, HashMap<&'static str, String>>> {
+		let mut client_map: HashMap<&'static str, HashMap<&'static str, String>> = HashMap::new();
+
+		client_map.insert("config", self.config.to_dict().unwrap());
+
+		Ok(client_map)
 	}
 }
