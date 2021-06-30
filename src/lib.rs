@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 // Modules
+mod constants;
 mod ssh;
 
 use ssh::*;
@@ -8,6 +9,7 @@ use ssh::*;
 #[pymodule]
 /// An SSH library for Python; written in Rust.
 fn russh(_: Python, m: &PyModule) -> PyResult<()> {
+	m.add_class::<SSHConfig>()?;
 	m.add_class::<Conn>()?;
 
 	Ok(())
