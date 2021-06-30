@@ -1,4 +1,5 @@
 use crate::constants::*;
+use crate::helpers::get_username;
 
 use pyo3::prelude::*;
 use ssh2::Session;
@@ -32,24 +33,27 @@ impl SSHConfig {
 	/// # Arguments:
 	///
 	/// * `addr` - The address of the host.
-	/// * `port` - The SSH port.
-	/// * `user` - The remote username.
+	/// * `port` - The SSH port (22 by default).
+	/// * `user` - The remote username (current local username by default).
 	/// * `auth` - Either a password or the path to a private key file.
-	pub fn new(addr: String, port: Option<u16>, user: String, auth: String) -> Self {
-		if let Some(p) = port {
-			return Self {
-				addr,
-				port: p,
-				user,
-				auth,
-			};
+	pub fn new(addr: String, port: Option<u16>, user: Option<String>, auth: String) -> Self {
+		// We initialize these values with default config values.
+		let mut some_user = get_username();
+		let mut some_port = DEFAULT_SSH_PORT;
+
+		// If config values were specified, we replace the default values.
+		if let Some(u) = user {
+			some_user = u;
 		}
 
-		// If no port is specified, we use the default SSH port.
+		if let Some(p) = port {
+			some_port = p;
+		}
+
 		Self {
 			addr,
-			port: DEFAULT_SSH_PORT,
-			user,
+			port: some_port,
+			user: some_user,
 			auth,
 		}
 	}

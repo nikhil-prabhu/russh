@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 
 // Modules
 mod constants;
+mod helpers;
 mod ssh;
 
 use ssh::*;
