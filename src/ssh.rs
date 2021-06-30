@@ -8,8 +8,8 @@ use std::path::Path;
 
 #[pyclass]
 #[derive(Clone)]
-/// SSH connection configuration.
-pub struct SSHConfig {
+/// SSH connection client configuration.
+pub struct ClientConfig {
 	addr: String,
 	port: u16,
 	user: String,
@@ -18,14 +18,14 @@ pub struct SSHConfig {
 
 #[pyclass]
 #[derive(Clone)]
-/// Represents an SSH connection.
-pub struct Conn {
-	config: SSHConfig,
+/// Represents an SSH connection client.
+pub struct Client {
+	config: ClientConfig,
 	sess: ssh2::Session,
 }
 
 #[pymethods]
-impl SSHConfig {
+impl ClientConfig {
 	// TODO: Add other auth options (interactive, host-agent, etc.).
 	#[new]
 	/// Returns an SSH configuration object.
@@ -60,7 +60,7 @@ impl SSHConfig {
 }
 
 #[pymethods]
-impl Conn {
+impl Client {
 	// TODO: Improve error handling, rather than just panicking on error.
 	#[new]
 	/// Establishes an SSH connection and returns the connection object.
@@ -70,7 +70,7 @@ impl Conn {
 	/// * `addr` - The address (along with port) of the host.
 	/// * `user` - The username.
 	/// * `auth` - Either a password or the path to a private key file.
-	pub fn new(config: SSHConfig) -> Self {
+	pub fn new(config: ClientConfig) -> Self {
 		// We create a TCP stream and connect a session to it.
 		let tcp = TcpStream::connect(format!("{}:{}", &config.addr, &config.port)).unwrap();
 		let mut sess = Session::new().unwrap();
