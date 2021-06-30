@@ -9,6 +9,13 @@ use std::path::Path;
 #[pyclass]
 #[derive(Clone)]
 /// SSH connection client configuration.
+///
+/// # Fields:
+///
+/// * `addr` - The address of the host.
+/// * `port` - The remote SSH port.
+/// * `user` - The remote username.
+/// * `auth` - Authentication value.
 pub struct ClientConfig {
 	addr: String,
 	port: u16,
@@ -19,9 +26,14 @@ pub struct ClientConfig {
 #[pyclass]
 #[derive(Clone)]
 /// Represents an SSH connection client.
+///
+/// # Fields:
+///
+/// * `config` - The connection client configuration.
+/// * `session` - The SSH session.
 pub struct Client {
 	config: ClientConfig,
-	sess: ssh2::Session,
+	session: ssh2::Session,
 }
 
 #[pymethods]
@@ -67,31 +79,32 @@ impl Client {
 	///
 	/// # Arguments:
 	///
-	/// * `addr` - The address (along with port) of the host.
-	/// * `user` - The username.
-	/// * `auth` - Either a password or the path to a private key file.
+	/// * `config` - The connection client configuration.
 	pub fn new(config: ClientConfig) -> Self {
 		// We create a TCP stream and connect a session to it.
 		let tcp = TcpStream::connect(format!("{}:{}", &config.addr, &config.port)).unwrap();
-		let mut sess = Session::new().unwrap();
-		sess.set_tcp_stream(tcp);
-		sess.handshake().unwrap();
+		let mut session = Session::new().unwrap();
+		session.set_tcp_stream(tcp);
+		session.handshake().unwrap();
 
 		// We check whether the issued `auth` value is a password or the
 		// path to a private key and authenticate the session using
 		// the appropriate method.
 		let keyfile = Path::new(&config.auth);
 		if keyfile.exists() {
-			sess.userauth_pubkey_file(&config.user, None, &keyfile, None)
+			session
+				.userauth_pubkey_file(&config.user, None, &keyfile, None)
 				.unwrap();
 		} else {
-			sess.userauth_password(&config.user, &config.auth).unwrap();
+			session
+				.userauth_password(&config.user, &config.auth)
+				.unwrap();
 		}
 		drop(keyfile);
 
 		// TODO: Improve authentication verification.
-		assert!(sess.authenticated());
+		assert!(session.authenticated());
 
-		Self { config, sess }
+		Self { config, session }
 	}
 }
