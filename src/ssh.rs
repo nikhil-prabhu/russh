@@ -155,7 +155,7 @@ impl Client {
 
 		// Perform authentication based on auth method.
 		//
-		// Authentication method priorities are as follows (in ascending order):
+		// Authentication method priorities are as follows (highest to lowest):
 		//
 		// 1. Private key.
 		// 2. Password.
