@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 use ssh2::Session;
 use std::collections::HashMap;
 use std::fmt;
+use std::io::prelude::*;
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -186,5 +187,24 @@ impl Client {
 		client_map.insert("config", self.config.to_dict().unwrap());
 
 		Ok(client_map)
+	}
+
+	// TODO: Return stdin, stdout and stderr, rather than directly returning output.
+	/// Runs a command on the remote host and returns the output as a string.
+	///
+	/// # Arguments:
+	///
+	/// * `cmd` - The command to run on the remote host.
+	pub fn run_cmd(&self, cmd: String) -> PyResult<String> {
+		// Open new channel from session and create new output buffer.
+		let mut channel = self.session.channel_session().unwrap();
+		let mut buf = String::new();
+
+		// Run command on remote host and read output into buffer.
+		channel.exec(&cmd).unwrap();
+		channel.read_to_string(&mut buf).unwrap();
+		channel.wait_close().unwrap();
+
+		Ok(buf)
 	}
 }
