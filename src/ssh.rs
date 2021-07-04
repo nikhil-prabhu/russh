@@ -96,7 +96,7 @@ impl ClientConfig {
 	/// * `addr` - The address of the host.
 	/// * `port` - The SSH port (22 by default).
 	/// * `user` - The remote username (current local username by default).
-	/// * `auth` - Either a password or the path to a private key file.
+	/// * `auth` - The authentication method to use.
 	pub fn new(addr: String, port: Option<u16>, user: Option<String>, auth: AuthMethod) -> Self {
 		// We initialize these values with default config values.
 		let mut some_user = get_username();
