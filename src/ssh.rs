@@ -49,11 +49,13 @@ impl AuthMethod {
 /// * `port` - The remote SSH port.
 /// * `user` - The remote username.
 /// * `auth` - Authentication value.
+/// * `timeout` - The connection timeout (in milliseconds).
 pub struct ClientConfig {
 	addr: String,
 	port: u16,
 	user: String,
 	auth: AuthMethod,
+	timeout: u32,
 }
 
 impl fmt::Display for ClientConfig {
@@ -97,10 +99,18 @@ impl ClientConfig {
 	/// * `port` - The SSH port (22 by default).
 	/// * `user` - The remote username (current local username by default).
 	/// * `auth` - The authentication method to use.
-	pub fn new(addr: String, port: Option<u16>, user: Option<String>, auth: AuthMethod) -> Self {
+	/// * `timeout` - The connection timeout in milliseconds (10 seconds by default).
+	pub fn new(
+		addr: String,
+		port: Option<u16>,
+		user: Option<String>,
+		auth: AuthMethod,
+		timeout: Option<u32>,
+	) -> Self {
 		// We initialize these values with default config values.
 		let mut some_user = get_username();
 		let mut some_port = DEFAULT_SSH_PORT;
+		let mut some_timeout = DEFAULT_SSH_TIMEOUT;
 
 		// If config values were specified, we replace the default values.
 		if let Some(u) = user {
@@ -111,11 +121,16 @@ impl ClientConfig {
 			some_port = p;
 		}
 
+		if let Some(t) = timeout {
+			some_timeout = t;
+		}
+
 		Self {
 			addr,
 			port: some_port,
 			user: some_user,
 			auth,
+			timeout: some_timeout,
 		}
 	}
 
@@ -152,6 +167,9 @@ impl Client {
 		let mut session = Session::new().unwrap();
 		session.set_tcp_stream(tcp);
 		session.handshake().unwrap();
+
+		// TODO: allow setting connection timeout.
+		session.set_timeout(config.timeout);
 
 		// Perform authentication based on auth method.
 		//
