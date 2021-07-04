@@ -10,6 +10,36 @@ use std::path::Path;
 
 #[pyclass]
 #[derive(Clone)]
+/// Authentication methods.
+///
+/// # Fields:
+///
+/// * `password` - A regular password.
+/// * `private_key` - An SSH private key file.
+pub struct AuthMethod {
+	password: Option<String>,
+	private_key: Option<String>,
+}
+
+#[pymethods]
+impl AuthMethod {
+	#[new]
+	/// Returns an authentication method object.
+	///
+	/// # Arguments:
+	///
+	/// * `password` - The remote user's password.
+	/// * `private_key` - The path to the SSH private key.
+	pub fn new(password: Option<String>, private_key: Option<String>) -> Self {
+		Self {
+			password,
+			private_key,
+		}
+	}
+}
+
+#[pyclass]
+#[derive(Clone)]
 /// SSH connection client configuration.
 ///
 /// # Fields:
@@ -22,15 +52,15 @@ pub struct ClientConfig {
 	addr: String,
 	port: u16,
 	user: String,
-	auth: String,
+	auth: AuthMethod,
 }
 
 impl fmt::Display for ClientConfig {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(
 			f,
-			"ClientConfig(addr={}, port={}, user={}, auth={})",
-			self.addr, self.port, self.user, self.auth,
+			"ClientConfig(addr={}, port={}, user={})",
+			self.addr, self.port, self.user,
 		)
 	}
 }
@@ -66,7 +96,7 @@ impl ClientConfig {
 	/// * `port` - The SSH port (22 by default).
 	/// * `user` - The remote username (current local username by default).
 	/// * `auth` - Either a password or the path to a private key file.
-	pub fn new(addr: String, port: Option<u16>, user: Option<String>, auth: String) -> Self {
+	pub fn new(addr: String, port: Option<u16>, user: Option<String>, auth: AuthMethod) -> Self {
 		// We initialize these values with default config values.
 		let mut some_user = get_username();
 		let mut some_port = DEFAULT_SSH_PORT;
@@ -101,7 +131,6 @@ impl ClientConfig {
 		conf_map.insert("addr", self.addr.clone());
 		conf_map.insert("port", self.port.to_string().clone());
 		conf_map.insert("user", self.user.clone());
-		conf_map.insert("auth", self.auth.clone());
 
 		Ok(conf_map)
 	}
@@ -123,21 +152,21 @@ impl Client {
 		session.set_tcp_stream(tcp);
 		session.handshake().unwrap();
 
-		// We check whether the issued `auth` value is a password or the
-		// path to a private key and authenticate the session using
-		// the appropriate method.
-		let keyfile = Path::new(&config.auth);
-		if keyfile.exists() {
+		// Perform authentication based on auth method.
+		//
+		// Authentication method priorities are as follows (in ascending order):
+		//
+		// 1. Private key.
+		// 2. Password.
+		if let Some(pk) = &config.auth.private_key {
+			// Private key authentication.
 			session
-				.userauth_pubkey_file(&config.user, None, &keyfile, None)
+				.userauth_pubkey_file(&config.user, None, Path::new(pk), None)
 				.unwrap();
-		} else {
-			session
-				.userauth_password(&config.user, &config.auth)
-				.unwrap();
+		} else if let Some(pw) = &config.auth.password {
+			// Password authentication.
+			session.userauth_password(&config.user, pw).unwrap();
 		}
-		drop(keyfile);
-
 		// TODO: Improve authentication verification.
 		assert!(session.authenticated());
 

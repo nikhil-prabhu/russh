@@ -10,6 +10,7 @@ use ssh::*;
 #[pymodule]
 /// An SSH library for Python; written in Rust.
 fn russh(_: Python, m: &PyModule) -> PyResult<()> {
+	m.add_class::<AuthMethod>()?;
 	m.add_class::<ClientConfig>()?;
 	m.add_class::<Client>()?;
 
