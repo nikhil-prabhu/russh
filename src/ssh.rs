@@ -17,9 +17,11 @@ use std::path::Path;
 ///
 /// * `password` - A regular password.
 /// * `private_key` - An SSH private key file.
+/// * `passphrase` - An SSH private key file passphrase.
 pub struct AuthMethod {
 	password: Option<String>,
 	private_key: Option<String>,
+	passphrase: Option<String>,
 }
 
 #[pymethods]
@@ -31,10 +33,16 @@ impl AuthMethod {
 	///
 	/// * `password` - The remote user's password.
 	/// * `private_key` - The path to the SSH private key.
-	pub fn new(password: Option<String>, private_key: Option<String>) -> Self {
+	/// * `passphrase` - Optional passphrase for the SSH private key.
+	pub fn new(
+		password: Option<String>,
+		private_key: Option<String>,
+		passphrase: Option<String>,
+	) -> Self {
 		Self {
 			password,
 			private_key,
+			passphrase,
 		}
 	}
 }
@@ -175,12 +183,17 @@ impl Client {
 		//
 		// Authentication method priorities are as follows (highest to lowest):
 		//
-		// 1. Private key.
+		// 1. Private key (with optional passphrase).
 		// 2. Password.
 		if let Some(pk) = &config.auth.private_key {
 			// Private key authentication.
 			session
-				.userauth_pubkey_file(&config.user, None, Path::new(pk), None)
+				.userauth_pubkey_file(
+					&config.user,
+					None,
+					Path::new(pk),
+					config.auth.passphrase.clone().as_deref(),
+				)
 				.unwrap();
 		} else if let Some(pw) = &config.auth.password {
 			// Password authentication.
