@@ -14,3 +14,7 @@ maintenance = { status = "experimental" }
 crate-type = ["cdylib"]
 
 [dependencies]
+
+[dependencies.pyo3]
+version = "0.19.2"
+features = ["abi3-py37"]
