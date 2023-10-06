@@ -1,0 +1,16 @@
+[package]
+name = "russh"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nikhil Prabhu <nikhilprabhu98@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/nikhil-prabhu/russh"
+keywords = ["pyo3", "python", "ssh"]
+
+[badges]
+maintenance = { status = "experimental" }
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
