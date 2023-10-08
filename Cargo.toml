@@ -14,6 +14,7 @@ maintenance = { status = "experimental" }
 crate-type = ["cdylib"]
 
 [dependencies]
+ssh2 = "0.9.4"
 
 [dependencies.pyo3]
 version = "0.19.2"
