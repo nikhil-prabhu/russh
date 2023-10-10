@@ -85,3 +85,16 @@ class SSHClient:
         """
 
         ...
+
+    def exec_command(self, command: str) -> str:
+        """Executes a command using the established session and returns the output.
+
+        Args:
+            command (str): The command to run.
+
+        Returns:
+            The command's output.
+
+        """
+
+        ...

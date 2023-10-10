@@ -141,4 +141,21 @@ impl SSHClient {
 
         self.sess = Some(sess);
     }
+
+    /// Executes a command using the established session and returns the output.
+    ///
+    /// # Arguments
+    ///
+    /// * `command` - The command to run.
+    pub fn exec_command(&self, command: String) -> String {
+        let mut buf = String::new();
+
+        if let Some(sess) = &self.sess {
+            let mut channel = sess.channel_session().unwrap();
+            channel.exec(&command).unwrap();
+            channel.read_to_string(&mut buf).unwrap();
+        }
+
+        buf
+    }
 }
