@@ -5,6 +5,7 @@
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/russh.svg)](https://pypi.python.org/pypi/russh/)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/ansicolortags/)
 [![PyPI status](https://img.shields.io/pypi/status/ansicolortags.svg)](https://pypi.python.org/pypi/ansicolortags/)
+![Workflow: Publish](https://github.com/nikhil-prabhu/russh/actions/workflows/Publish.yml/badge.svg)
 
 ![russh: logo](assets/logo.png)
 
