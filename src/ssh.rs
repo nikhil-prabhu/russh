@@ -1,5 +1,6 @@
 //! SSH types and methods.
 
+use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
 use std::path::Path;
 use std::time::Duration;
@@ -122,7 +123,7 @@ impl SSHClient {
         let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(timeout as u64)).unwrap();
         let mut sess = Session::new().unwrap();
 
-        sess.set_timeout(timeout);
+        sess.set_timeout(timeout * 1000);
         sess.set_tcp_stream(tcp);
         sess.handshake().unwrap();
 
