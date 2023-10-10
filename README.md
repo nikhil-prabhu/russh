@@ -2,6 +2,7 @@
 
 ![maintenance-status](https://img.shields.io/badge/maintenance-experimental-blue.svg)
 [![PyPI version](https://badge.fury.io/py/russh.svg)](https://badge.fury.io/py/russh)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/russh.svg)](https://pypi.python.org/pypi/russh/)
 [![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.python.org/pypi/ansicolortags/)
 [![PyPI status](https://img.shields.io/pypi/status/ansicolortags.svg)](https://pypi.python.org/pypi/ansicolortags/)
 

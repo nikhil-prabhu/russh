@@ -1,10 +1,14 @@
 //! SSH types and methods.
 
+use std::error::Error;
+use std::fmt;
+use std::fmt::Formatter;
 use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
 use std::path::Path;
 use std::time::Duration;
 
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use ssh2::Session;
 
@@ -12,6 +16,56 @@ use ssh2::Session;
 const DEFAULT_PORT: u16 = 22;
 /// Default connection timeout.
 const DEFAULT_TIMEOUT: u32 = 30;
+
+// TODO: Make custom exception uniquely identifiable in Python, rather than just being a base `Exception`.
+#[pyclass]
+#[derive(Debug, PartialEq)]
+/// Custom Python exception time for any kind of error.
+pub struct RusshException(pub String);
+
+#[pymethods]
+impl RusshException {
+    #[new]
+    /// Creates a new [`RusshException`].
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The error message.
+    pub fn __new__(message: String) -> Self {
+        Self(message)
+    }
+
+    /// Python's `__str__` metaclass.
+    ///
+    /// Returns a string representation of [`Self`].
+    pub fn __str__(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl fmt::Display for RusshException {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Error for RusshException {}
+
+impl From<RusshException> for PyErr {
+    /// Creates a [`PyErr`] from a [`RusshException`].
+    fn from(error: RusshException) -> Self {
+        PyErr::new::<PyException, _>(error.to_string())
+    }
+}
+
+/// Convenience function to convert a generic error to a [`RusshException`].
+///
+/// # Arguments
+///
+/// * `err` - The error.
+fn russh_exception_from_err<E: Error>(err: E) -> RusshException {
+    RusshException(err.to_string())
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -99,7 +153,6 @@ impl SSHClient {
         Self { sess: None }
     }
 
-    // TODO: Return a Result instead of unwrapping.
     /// Establishes an SSH connection and sets the created session on the client.
     ///
     /// # Arguments
@@ -116,47 +169,52 @@ impl SSHClient {
         auth: AuthMethods,
         port: Option<u16>,
         timeout: Option<u32>,
-    ) {
+    ) -> Result<(), RusshException> {
         let port = port.unwrap_or(DEFAULT_PORT);
         let timeout = timeout.unwrap_or(DEFAULT_TIMEOUT);
-        let addr: SocketAddr = format!("{host}:{port}").parse().unwrap();
-        let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(timeout as u64)).unwrap();
-        let mut sess = Session::new().unwrap();
+        let addr: SocketAddr = format!("{host}:{port}").parse().map_err(russh_exception_from_err)?;
+        let tcp = TcpStream::connect_timeout(
+            &addr,
+            Duration::from_secs(timeout as u64),
+        ).map_err(russh_exception_from_err)?;
 
+        let mut sess = Session::new().map_err(russh_exception_from_err)?;
         sess.set_timeout(timeout * 1000);
         sess.set_tcp_stream(tcp);
-        sess.handshake().unwrap();
+        sess.handshake().map_err(russh_exception_from_err)?;
 
         if let Some(password) = auth.password {
-            sess.userauth_password(&username, &password.0).unwrap();
+            sess.userauth_password(&username, &password.0).map_err(russh_exception_from_err)?;
         } else if let Some(private_key) = auth.private_key {
             sess.userauth_pubkey_file(
                 &username,
                 None,
                 Path::new(&private_key.private_key),
                 private_key.passphrase.as_deref(),
-            )
-            .unwrap();
+            ).map_err(russh_exception_from_err)?;
         }
 
         self.sess = Some(sess);
+
+        Ok(())
     }
 
+    // TODO: Return `stdin`, `stdin` and `stdout` rather than just contents of `stdout`.
     /// Executes a command using the underlying session and returns the output.
     ///
     /// # Arguments
     ///
     /// * `command` - The command to run.
-    pub fn exec_command(&self, command: String) -> String {
+    pub fn exec_command(&self, command: String) -> Result<String, RusshException> {
         let mut buf = String::new();
 
         if let Some(sess) = &self.sess {
-            let mut channel = sess.channel_session().unwrap();
-            channel.exec(&command).unwrap();
-            channel.read_to_string(&mut buf).unwrap();
+            let mut channel = sess.channel_session().map_err(russh_exception_from_err)?;
+            channel.exec(&command).map_err(russh_exception_from_err)?;
+            channel.read_to_string(&mut buf).map_err(russh_exception_from_err)?;
         }
 
-        buf
+        Ok(buf)
     }
 
     /// Closes the underlying session.
