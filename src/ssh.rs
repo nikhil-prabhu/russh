@@ -29,7 +29,7 @@ fn russh_exception_from_err<E: Error>(err: E) -> PyErr {
 
 #[pyclass]
 #[derive(Clone)]
-/// Represents password based authentication.
+/// Represents password-based authentication.
 pub struct PasswordAuth(pub String);
 
 #[pymethods]
@@ -47,7 +47,7 @@ impl PasswordAuth {
 
 #[pyclass]
 #[derive(Clone)]
-/// Represents private-key based authentication.
+/// Represents private-key-based authentication.
 pub struct PrivateKeyAuth {
     /// The path to the private-key file.
     pub private_key: String,
@@ -74,12 +74,12 @@ impl PrivateKeyAuth {
 
 #[pyclass]
 #[derive(Clone)]
-// TODO: Describe order of priority.
+// TODO: Describe the order of priority.
 /// Represents supported authentication methods.
 pub struct AuthMethods {
-    /// Password based authentication method.
+    /// Password-based authentication method.
     pub password: Option<PasswordAuth>,
-    /// Private-key based authentication method.
+    /// Private-key-based authentication method.
     pub private_key: Option<PrivateKeyAuth>,
 }
 
@@ -88,8 +88,8 @@ impl AuthMethods {
     #[new]
     /// Creates a new [`AuthMethods`].
     ///
-    /// * `password` - Password based authentication method.
-    /// * `private_key` - Private-key based authentication method.
+    /// * `password` - Password-based authentication method.
+    /// * `private_key` - Private-key-based authentication method.
     pub fn __new__(password: Option<PasswordAuth>, private_key: Option<PrivateKeyAuth>) -> Self {
         Self {
             password,
@@ -133,10 +133,8 @@ impl SSHClient {
         let port = port.unwrap_or(DEFAULT_PORT);
         let timeout = timeout.unwrap_or(DEFAULT_TIMEOUT);
         let addr: SocketAddr = format!("{host}:{port}").parse().map_err(russh_exception_from_err)?;
-        let tcp = TcpStream::connect_timeout(
-            &addr,
-            Duration::from_secs(timeout as u64),
-        ).map_err(russh_exception_from_err)?;
+        let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(timeout as u64))
+            .map_err(russh_exception_from_err)?;
 
         let mut sess = Session::new().map_err(russh_exception_from_err)?;
         sess.set_timeout(timeout * 1000);
@@ -151,7 +149,8 @@ impl SSHClient {
                 None,
                 Path::new(&private_key.private_key),
                 private_key.passphrase.as_deref(),
-            ).map_err(russh_exception_from_err)?;
+            )
+                .map_err(russh_exception_from_err)?;
         }
 
         self.sess = Some(sess);
@@ -159,7 +158,7 @@ impl SSHClient {
         Ok(())
     }
 
-    // TODO: Return `stdin`, `stdin` and `stdout` rather than just contents of `stdout`.
+    // TODO: Return `stdin`, `stdin`, and `stdout` rather than just contents of `stdout`.
     /// Executes a command using the underlying session and returns the output.
     ///
     /// # Arguments
