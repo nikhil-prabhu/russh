@@ -3,6 +3,12 @@
 
 from typing import Optional
 
+class RusshException(Exception):
+    """Custom exception type for all `russh` errors.
+    """
+
+    ...
+
 class PasswordAuth:
     """Represents password based authentication.
     """

@@ -1,13 +1,10 @@
 //! An SSH library for Python; written in Rust.
 
-mod ssh;
-
 use pyo3::prelude::*;
-use pyo3::exceptions::PyException;
 
 use ssh::*;
 
-pyo3::create_exception!(russh, RusshException, PyException);
+mod ssh;
 
 #[pymodule]
 fn russh(py: Python<'_>, m: &PyModule) -> PyResult<()> {

@@ -1,8 +1,6 @@
 //! SSH types and methods.
 
 use std::error::Error;
-use std::fmt;
-use std::fmt::Formatter;
 use std::io::Read;
 use std::net::{SocketAddr, TcpStream};
 use std::path::Path;
@@ -17,54 +15,16 @@ const DEFAULT_PORT: u16 = 22;
 /// Default connection timeout.
 const DEFAULT_TIMEOUT: u32 = 30;
 
-// TODO: Make custom exception uniquely identifiable in Python, rather than just being a base `Exception`.
-#[pyclass]
-#[derive(Debug, PartialEq)]
-/// Custom Python exception time for any kind of error.
-pub struct RusshException(pub String);
-
-#[pymethods]
-impl RusshException {
-    #[new]
-    /// Creates a new [`RusshException`].
-    ///
-    /// # Arguments
-    ///
-    /// * `message` - The error message.
-    pub fn __new__(message: String) -> Self {
-        Self(message)
-    }
-
-    /// Python's `__str__` metaclass.
-    ///
-    /// Returns a string representation of [`Self`].
-    pub fn __str__(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl fmt::Display for RusshException {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Error for RusshException {}
-
-impl From<RusshException> for PyErr {
-    /// Creates a [`PyErr`] from a [`RusshException`].
-    fn from(error: RusshException) -> Self {
-        PyErr::new::<PyException, _>(error.to_string())
-    }
-}
+// Custom Python exception type.
+pyo3::create_exception!(russh, RusshException, PyException);
 
 /// Convenience function to convert a generic error to a [`RusshException`].
 ///
 /// # Arguments
 ///
 /// * `err` - The error.
-fn russh_exception_from_err<E: Error>(err: E) -> RusshException {
-    RusshException(err.to_string())
+fn russh_exception_from_err<E: Error>(err: E) -> PyErr {
+    RusshException::new_err(err.to_string())
 }
 
 #[pyclass]
@@ -169,7 +129,7 @@ impl SSHClient {
         auth: AuthMethods,
         port: Option<u16>,
         timeout: Option<u32>,
-    ) -> Result<(), RusshException> {
+    ) -> PyResult<()> {
         let port = port.unwrap_or(DEFAULT_PORT);
         let timeout = timeout.unwrap_or(DEFAULT_TIMEOUT);
         let addr: SocketAddr = format!("{host}:{port}").parse().map_err(russh_exception_from_err)?;
@@ -205,7 +165,7 @@ impl SSHClient {
     /// # Arguments
     ///
     /// * `command` - The command to run.
-    pub fn exec_command(&self, command: String) -> Result<String, RusshException> {
+    pub fn exec_command(&self, command: String) -> PyResult<String> {
         let mut buf = String::new();
 
         if let Some(sess) = &self.sess {
