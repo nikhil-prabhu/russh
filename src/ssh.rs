@@ -142,7 +142,7 @@ impl SSHClient {
         self.sess = Some(sess);
     }
 
-    /// Executes a command using the established session and returns the output.
+    /// Executes a command using the underlying session and returns the output.
     ///
     /// # Arguments
     ///
