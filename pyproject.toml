@@ -5,6 +5,7 @@ requires-python = ">=3.7"
 license = "MIT"
 classifiers = [
     "Programming Language :: Rust",
+    "Programming Language :: Python",
     "License :: OSI Approved :: MIT License",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS",
