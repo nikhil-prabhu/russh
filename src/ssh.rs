@@ -158,4 +158,9 @@ impl SSHClient {
 
         buf
     }
+
+    /// Closes the underlying session.
+    pub fn close(&mut self) {
+        self.sess.take();
+    }
 }

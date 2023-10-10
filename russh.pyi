@@ -98,3 +98,12 @@ class SSHClient:
         """
 
         ...
+
+    def close(self):
+        """Closes the underlying session.
+
+        Returns:
+            None
+        """
+
+        ...
