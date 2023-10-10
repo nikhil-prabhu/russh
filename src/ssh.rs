@@ -26,7 +26,7 @@ impl PasswordAuth {
     /// # Arguments
     ///
     /// * `password` - The password.
-    pub fn new(password: String) -> Self {
+    pub fn __new__(password: String) -> Self {
         Self(password)
     }
 }
@@ -50,7 +50,7 @@ impl PrivateKeyAuth {
     ///
     /// * `private_key` - The path to the private-key file.
     /// * `passphrase` - The password for the private-key file.
-    pub fn new(private_key: String, passphrase: Option<String>) -> Self {
+    pub fn __new__(private_key: String, passphrase: Option<String>) -> Self {
         Self {
             private_key,
             passphrase,
@@ -76,7 +76,7 @@ impl AuthMethods {
     ///
     /// * `password` - Password based authentication method.
     /// * `private_key` - Private-key based authentication method.
-    pub fn new(password: Option<PasswordAuth>, private_key: Option<PrivateKeyAuth>) -> Self {
+    pub fn __new__(password: Option<PasswordAuth>, private_key: Option<PrivateKeyAuth>) -> Self {
         Self {
             password,
             private_key,
@@ -95,7 +95,7 @@ pub struct SSHClient {
 impl SSHClient {
     #[new]
     /// Creates a new [`SSHClient`].
-    pub fn new() -> Self {
+    pub fn __new__() -> Self {
         Self { sess: None }
     }
 
