@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci github
 #
-name: Publish
+name: publish
 
 on:
   push:
