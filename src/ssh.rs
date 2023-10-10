@@ -50,7 +50,10 @@ impl PrivateKeyAuth {
     /// * `private_key` - The path to the private-key file.
     /// * `passphrase` - The password for the private-key file.
     pub fn new(private_key: String, passphrase: Option<String>) -> Self {
-        Self { private_key, passphrase }
+        Self {
+            private_key,
+            passphrase,
+        }
     }
 }
 
@@ -73,7 +76,10 @@ impl AuthMethods {
     /// * `password` - Password based authentication method.
     /// * `private_key` - Private-key based authentication method.
     pub fn new(password: Option<PasswordAuth>, private_key: Option<PrivateKeyAuth>) -> Self {
-        Self { password, private_key }
+        Self {
+            password,
+            private_key,
+        }
     }
 }
 
@@ -102,14 +108,18 @@ impl SSHClient {
     /// * `auth` - The authentication methods to use.
     /// * `port` The SSH port. Defaults to 22.
     /// * `timeout` - The connection timeout (in seconds). Defaults to 30.
-    pub fn connect(&mut self, host: String, username: String, auth: AuthMethods, port: Option<u16>, timeout: Option<u32>) {
+    pub fn connect(
+        &mut self,
+        host: String,
+        username: String,
+        auth: AuthMethods,
+        port: Option<u16>,
+        timeout: Option<u32>,
+    ) {
         let port = port.unwrap_or(DEFAULT_PORT);
         let timeout = timeout.unwrap_or(DEFAULT_TIMEOUT);
         let addr: SocketAddr = format!("{host}:{port}").parse().unwrap();
-        let tcp = TcpStream::connect_timeout(
-            &addr,
-            Duration::from_secs(timeout as u64),
-        ).unwrap();
+        let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(timeout as u64)).unwrap();
         let mut sess = Session::new().unwrap();
 
         sess.set_timeout(timeout);
@@ -124,7 +134,8 @@ impl SSHClient {
                 None,
                 Path::new(&private_key.private_key),
                 private_key.passphrase.as_deref(),
-            ).unwrap();
+            )
+            .unwrap();
         }
 
         self.sess = Some(sess);
