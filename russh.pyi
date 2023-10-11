@@ -182,6 +182,15 @@ class SFTPClient:
 
         ...
 
+    def mkdir(self, dir: str, mode: int = 511) -> None:
+        ...
+
+    def remove(self, path: str) -> None:
+        ...
+
+    def rmdir(self, dir: str) -> None:
+        ...
+
     def open(self, filename: str) -> File:
         """Opens a file on the remote server.
 
@@ -192,6 +201,32 @@ class SFTPClient:
 
         Returns:
             The opened :class:`File`.
+        """
+
+        ...
+
+    def get(self, remotepath: str, localpath: str) -> None:
+        """Copies a file from the remote server to the local host.
+
+        Args:
+            remotepath (str): The remote file path.
+            localpath (str): The local path to copy the file to.
+
+        Returns:
+            None
+        """
+
+        ...
+
+    def put(self, localpath: str, remotepath: str) -> None:
+        """Copies a local file to the remote server.
+
+        Args:
+            localpath (str): The path to the local file.
+            remotepath (str): The remote path to copy the file to.
+
+        Returns:
+
         """
 
         ...

@@ -1,6 +1,7 @@
 //! SSH types and methods.
 
 use std::error::Error;
+use std::fs;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
@@ -249,7 +250,8 @@ impl File {
     pub fn write(&mut self, data: String) -> PyResult<()> {
         self.0
             .write_all(data.as_bytes())
-            .map_err(russh_exception_from_err)
+            .map_err(russh_exception_from_err)?;
+        self.0.flush().map_err(russh_exception_from_err)
     }
 }
 #[pyclass]
@@ -302,6 +304,70 @@ impl SFTPClient {
         self.cwd.clone()
     }
 
+    /// Creates a folder on the remote server with the specified numeric mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` The directory to create.
+    /// * `mode` - POSIX-style permissions for the newly-created folder. Defaults to 511.
+    pub fn mkdir(&mut self, dir: String, mode: Option<i32>) -> PyResult<()> {
+        let mode = mode.unwrap_or(511);
+
+        if let Some(client) = self.client.as_mut() {
+            let path = path_from_string(self.cwd.clone(), dir);
+            return Ok(client
+                .mkdir(&path, mode)
+                .map_err(russh_exception_from_err)?);
+        }
+
+        Err(RusshException::new_err("SFTP session not open".to_string()))
+    }
+
+    /// Removes a file from the remote server.
+    ///
+    /// **NOTE**: This only works for files. For directories, use [`SFTPClient::rmdir`].
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file to remove.
+    pub fn unlink(&mut self, path: String) -> PyResult<()> {
+        if let Some(client) = self.client.as_mut() {
+            let path = path_from_string(self.cwd.clone(), path);
+            return Ok(client.unlink(&path).map_err(russh_exception_from_err)?);
+        }
+
+        Err(RusshException::new_err("SFTP session not open".to_string()))
+    }
+
+    /// Removes a file from the remote server.
+    ///
+    /// **NOTE**: This method is just an alias to [`SFTPClient::unlink`] to mimic compatibility with paramiko.
+    ///
+    /// **NOTE**: This only works for files. For directories, use [`SFTPClient::rmdir`].
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file to remove.
+    pub fn remove(&mut self, path: String) -> PyResult<()> {
+        self.unlink(path)
+    }
+
+    /// Removes a directory from the remove server.
+    ///
+    /// **NOTE**: This only works for directories. For files, use [`SFTPClient::remove`].
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The path to the directory to remove.
+    pub fn rmdir(&mut self, dir: String) -> PyResult<()> {
+        if let Some(client) = self.client.as_mut() {
+            let path = path_from_string(self.cwd.clone(), dir);
+            return Ok(client.rmdir(&path).map_err(russh_exception_from_err)?);
+        }
+
+        Err(RusshException::new_err("SFTP session not open".to_string()))
+    }
+
     /// Opens a file on the remote server.
     ///
     /// The opened file is both readable and writable.
@@ -313,6 +379,62 @@ impl SFTPClient {
         if let Some(client) = self.client.as_mut() {
             let path = path_from_string(self.cwd.clone(), filename);
             return Ok(File(client.open(&path).map_err(russh_exception_from_err)?));
+        }
+
+        Err(RusshException::new_err("SFTP session not open".to_string()))
+    }
+
+    /// Opens a file on the remote server.
+    ///
+    /// **NOTE**: This method is just an alias to [`SFTPClient::open`] to mimic compatibility with paramiko.
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The name of the file (if the file is in `cwd`) OR the path to the file.
+    pub fn file(&mut self, filename: String) -> PyResult<File> {
+        self.open(filename)
+    }
+
+    /// Copies a file from the remote server to the local host.
+    ///
+    /// # Arguments
+    ///
+    /// * `remotepath` - The remote file path.
+    /// * `localpath` - The local path to copy the file to.
+    pub fn get(&mut self, remotepath: String, localpath: String) -> PyResult<()> {
+        if let Some(client) = self.client.as_mut() {
+            let remotepath = path_from_string(self.cwd.clone(), remotepath);
+
+            let mut buf = String::new();
+            let mut file = client.open(&remotepath).map_err(russh_exception_from_err)?;
+            file.read_to_string(&mut buf)
+                .map_err(russh_exception_from_err)?;
+
+            return Ok(fs::write(&localpath, buf).map_err(russh_exception_from_err)?);
+        }
+
+        Err(RusshException::new_err("SFTP session not open".to_string()))
+    }
+
+    /// Copies a local file to the remote server.
+    ///
+    /// # Arguments
+    ///
+    /// * `localpath` - The path to the local file.
+    /// * `remotepath` - The remote path to copy the file to.
+    pub fn put(&mut self, localpath: String, remotepath: String) -> PyResult<()> {
+        if let Some(client) = self.client.as_mut() {
+            let remotepath = path_from_string(self.cwd.clone(), remotepath.clone());
+            client
+                .create(&remotepath)
+                .map_err(russh_exception_from_err)?;
+
+            let content = fs::read_to_string(&localpath).map_err(russh_exception_from_err)?;
+            let mut file = client.open(&remotepath).map_err(russh_exception_from_err)?;
+
+            return Ok(file
+                .write_all(content.as_bytes())
+                .map_err(russh_exception_from_err)?);
         }
 
         Err(RusshException::new_err("SFTP session not open".to_string()))
