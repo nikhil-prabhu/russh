@@ -3,12 +3,12 @@
 use std::error::Error;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
-use ssh2::{Channel, Session, Stream};
+use ssh2::{Channel, Session, Sftp, Stream};
 
 /// Default SSH port.
 const DEFAULT_PORT: u16 = 22;
@@ -205,6 +205,130 @@ impl ExecOutput {
     }
 }
 
+/// Convenience function that concatenates a base and a child path into a [`PathBuf`].
+///
+/// If the base is `None`, the child path is returned as a [`PathBuf`].
+///
+/// # Arguments
+///
+/// * `base` - Optional base path.
+/// * `path` - The child path.
+fn path_from_string(base: Option<String>, path: String) -> PathBuf {
+    if let Some(base) = base {
+        let mut base_path = PathBuf::new();
+        base_path.push(base);
+        base_path.push(path);
+
+        return base_path;
+    }
+
+    Path::new(&path).to_path_buf()
+}
+
+#[pyclass]
+/// A file on a remote server.
+pub struct File(pub ssh2::File);
+
+#[pymethods]
+impl File {
+    /// Reads and returns the contents of the file.
+    pub fn read(&mut self) -> PyResult<String> {
+        let mut buf = String::new();
+        self.0
+            .read_to_string(&mut buf)
+            .map_err(russh_exception_from_err)?;
+
+        Ok(buf)
+    }
+
+    /// Writes the specified data to the file.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The data to write to the file.
+    pub fn write(&mut self, data: String) -> PyResult<()> {
+        self.0
+            .write_all(data.as_bytes())
+            .map_err(russh_exception_from_err)
+    }
+}
+#[pyclass]
+/// The SFTP client.
+pub struct SFTPClient {
+    /// Underlying SFTP client.
+    client: Option<Sftp>,
+    /// Current working directory.
+    cwd: Option<String>,
+}
+
+#[pymethods]
+impl SFTPClient {
+    /// Changes the current working directory to the specified directory.
+    ///
+    /// If the specified directory is `None`, then the current working directory is unset.
+    ///
+    /// Once the current working directory is set, all SFTP operations will be relative to this path.
+    ///
+    /// **NOTE**: SFTP does not have a concept of a "current working directory", and so, this function
+    /// tries to emulate it. Currently, only **absolute** paths are supported. This *MAY* change in the
+    /// future, but is not guaranteed.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The directory to change to.
+    pub fn chdir(&mut self, dir: Option<String>) -> PyResult<()> {
+        if let Some(client) = self.client.as_mut() {
+            if let Some(path) = &dir {
+                let path = Path::new(&path);
+
+                if let Err(_) = client.opendir(path) {
+                    return Err(RusshException::new_err(format!(
+                        "Path {} does not exist on server",
+                        path.display()
+                    )));
+                }
+            }
+
+            self.cwd = dir;
+        } else {
+            return Err(RusshException::new_err("SFTP session not open".to_string()));
+        }
+
+        Ok(())
+    }
+
+    /// Returns the current working directory.
+    pub fn getcwd(&self) -> Option<String> {
+        self.cwd.clone()
+    }
+
+    /// Opens a file on the remote server.
+    ///
+    /// The opened file is both readable and writable.
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The name of the file (if file is in `cwd`) OR the path to the file.
+    pub fn open(&mut self, filename: String) -> PyResult<File> {
+        if let Some(client) = self.client.as_mut() {
+            let path = path_from_string(self.cwd.clone(), filename);
+            return Ok(File(client.open(&path).map_err(russh_exception_from_err)?));
+        }
+
+        Err(RusshException::new_err("SFTP session not open".to_string()))
+    }
+
+    /// Checks if the SFTP session is closed.
+    pub fn is_closed(&self) -> bool {
+        self.client.is_none()
+    }
+
+    /// Closes the SFTP session.
+    pub fn close(&mut self) {
+        self.client.take();
+    }
+}
+
 #[pyclass]
 /// The SSH client.
 pub struct SSHClient {
@@ -265,6 +389,18 @@ impl SSHClient {
         self.sess = Some(sess);
 
         Ok(())
+    }
+
+    /// Opens an SFTP session using the SSH session.
+    ///
+    /// Fails if there is no active SSH session (if [`SSHClient::connect`] was not called).
+    pub fn open_sftp(&self) -> PyResult<SFTPClient> {
+        if let Some(sess) = &self.sess {
+            let client = Some(sess.sftp().map_err(russh_exception_from_err)?);
+            return Ok(SFTPClient { client, cwd: None });
+        }
+
+        Err(RusshException::new_err("No active SSH session".to_string()))
     }
 
     /// Executes a command using the underlying session and returns the output.

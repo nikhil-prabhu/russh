@@ -124,6 +124,96 @@ class ExecOutput:
         ...
 
 
+class File:
+    """A file on a remote server.
+    """
+
+    def read(self) -> str:
+        """Reads and returns the contents of the file.
+
+        Returns:
+            The contents of the file.
+        """
+
+        ...
+
+    def write(self, data: str) -> None:
+        """Writes the specified data to the file.
+
+        Args:
+            data (str): The data to write to the file.
+
+        Returns:
+            None
+        """
+
+        ...
+
+class SFTPClient:
+    """The SFTP client.
+    """
+
+    def chdir(self, dir: Optional[str] = None) -> None:
+        """Changes the current working directory to the specified directory.
+
+        If the specified directory is `None`, then the current working directory is unset.
+
+        Once the current working directory is set, all SFTP operations will be relative to this path.
+
+        **NOTE**: SFTP does not have a concept of a "current working directory", and so, this function
+        tries to emulate it. Currently, only **absolute** paths are supported. This *MAY* change in the
+        future, but is not guaranteed.
+
+        Args:
+            dir (str): The directory to change to.
+
+        Returns:
+            None
+        """
+
+        ...
+
+    def getcwd(self) -> Optional[str]:
+        """Returns the current working directory.
+
+        Returns:
+            The current working directory.
+        """
+
+        ...
+
+    def open(self, filename: str) -> File:
+        """Opens a file on the remote server.
+
+        The opened file is both readable and writable.
+
+        Args:
+            filename (str): The name of the file (if file is in `cwd`) OR the path to the file.
+
+        Returns:
+            The opened :class:`File`.
+        """
+
+        ...
+
+    def is_closed(self) -> bool:
+        """Checks if the SFTP session is closed.
+
+        Returns:
+            Whether SFTP session is closed.
+        """
+
+        ...
+
+    def close(self) -> None:
+        """Closes the SFTP session.
+
+        Returns:
+            None
+        """
+
+        ...
+
 class SSHClient:
     """The SSH client.
     """
@@ -157,6 +247,16 @@ class SSHClient:
 
         ...
 
+    def open_sftp(self) -> SFTPClient:
+        """Opens an SFTP session using the SSH session.
+
+        Fails if there is no active SSH session (if :func:`SSHClient.connect` was not called).
+
+        Returns:
+            The SFTP client.
+        """
+
+        ...
     def exec_command(self, command: str) -> ExecOutput:
         """Executes a command using the established session and returns the output.
 

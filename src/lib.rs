@@ -13,6 +13,8 @@ fn russh(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_class::<PasswordAuth>()?;
     m.add_class::<PrivateKeyAuth>()?;
     m.add_class::<AuthMethods>()?;
+    m.add_class::<File>()?;
+    m.add_class::<SFTPClient>()?;
     m.add_class::<SSHClient>()?;
 
     Ok(())
