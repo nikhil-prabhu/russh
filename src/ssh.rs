@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
-use ssh2::Session;
+use ssh2::{Channel, Session, Stream};
 
 /// Default SSH port.
 const DEFAULT_PORT: u16 = 22;
@@ -99,6 +99,83 @@ impl AuthMethods {
 }
 
 #[pyclass]
+/// Represents the output produced when running [`SSHClient::exec_command`].
+pub struct ExecOutput {
+    channel: Option<Channel>,
+    /// The `stdin` stream. Currently just a placeholder and is unused.
+    _stdin: Option<Stream>,
+    /// The `stdout` stream's contents.
+    stdout: Option<Stream>,
+    /// The `stderr` stream's contents.
+    stderr: Option<Stream>,
+}
+
+#[pymethods]
+impl ExecOutput {
+    /// Writes the specified data to the `stdin` stream.
+    ///
+    /// Currently not implemented.
+    fn _write_stdin(&mut self, _data: String) -> PyResult<()> {
+        todo!()
+    }
+
+    /// Reads the contents of the `stdout` stream and consumes it.
+    ///
+    /// **NOTE**: Future calls will return an empty string.
+    fn read_stdout(&mut self) -> PyResult<String> {
+        let mut buf = String::new();
+
+        if let Some(mut stdout) = self.stdout.take() {
+            stdout
+                .read_to_string(&mut buf)
+                .map_err(russh_exception_from_err)?;
+        }
+
+        Ok(buf)
+    }
+
+    /// Reads the contents of the `stderr` stream and consumes it.
+    ///
+    /// **NOTE**: Future calls will return an empty string.
+    fn read_stderr(&mut self) -> PyResult<String> {
+        let mut buf = String::new();
+
+        if let Some(mut stderr) = self.stderr.take() {
+            stderr
+                .read_to_string(&mut buf)
+                .map_err(russh_exception_from_err)?;
+        }
+
+        Ok(buf)
+    }
+
+    /// Retrieves the exit status of the command and closes the channel and all streams.
+    ///
+    /// **NOTE**: Future calls will return 0.
+    ///
+    /// **NOTE**: Future reads of the `stdout` or `stderr` streams will return empty strings.
+    fn exit_status(&mut self) -> PyResult<i32> {
+        let mut exit_status = 0;
+
+        if let Some(mut chan) = self.channel.take() {
+            let mut stdout = String::new();
+            let mut stderr = String::new();
+
+            chan.read_to_string(&mut stdout)
+                .map_err(russh_exception_from_err)?;
+            chan.stderr()
+                .read_to_string(&mut stderr)
+                .map_err(russh_exception_from_err)?;
+
+            chan.wait_close().map_err(russh_exception_from_err)?;
+            exit_status = chan.exit_status().map_err(russh_exception_from_err)?;
+        }
+
+        Ok(exit_status)
+    }
+}
+
+#[pyclass]
 /// The SSH client.
 pub struct SSHClient {
     /// Established SSH session.
@@ -132,7 +209,9 @@ impl SSHClient {
     ) -> PyResult<()> {
         let port = port.unwrap_or(DEFAULT_PORT);
         let timeout = timeout.unwrap_or(DEFAULT_TIMEOUT);
-        let addr: SocketAddr = format!("{host}:{port}").parse().map_err(russh_exception_from_err)?;
+        let addr: SocketAddr = format!("{host}:{port}")
+            .parse()
+            .map_err(russh_exception_from_err)?;
         let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(timeout as u64))
             .map_err(russh_exception_from_err)?;
 
@@ -142,7 +221,8 @@ impl SSHClient {
         sess.handshake().map_err(russh_exception_from_err)?;
 
         if let Some(password) = auth.password {
-            sess.userauth_password(&username, &password.0).map_err(russh_exception_from_err)?;
+            sess.userauth_password(&username, &password.0)
+                .map_err(russh_exception_from_err)?;
         } else if let Some(private_key) = auth.private_key {
             sess.userauth_pubkey_file(
                 &username,
@@ -150,7 +230,7 @@ impl SSHClient {
                 Path::new(&private_key.private_key),
                 private_key.passphrase.as_deref(),
             )
-                .map_err(russh_exception_from_err)?;
+            .map_err(russh_exception_from_err)?;
         }
 
         self.sess = Some(sess);
@@ -158,22 +238,33 @@ impl SSHClient {
         Ok(())
     }
 
-    // TODO: Return `stdin`, `stdin`, and `stdout` rather than just contents of `stdout`.
     /// Executes a command using the underlying session and returns the output.
     ///
     /// # Arguments
     ///
     /// * `command` - The command to run.
-    pub fn exec_command(&self, command: String) -> PyResult<String> {
-        let mut buf = String::new();
+    pub fn exec_command(&self, command: String) -> PyResult<ExecOutput> {
+        let mut stdin = None;
+        let mut stdout = None;
+        let mut stderr = None;
+        let mut channel = None;
 
         if let Some(sess) = &self.sess {
-            let mut channel = sess.channel_session().map_err(russh_exception_from_err)?;
-            channel.exec(&command).map_err(russh_exception_from_err)?;
-            channel.read_to_string(&mut buf).map_err(russh_exception_from_err)?;
+            let mut chan = sess.channel_session().map_err(russh_exception_from_err)?;
+            chan.exec(&command).map_err(russh_exception_from_err)?;
+
+            stdin = Some(chan.stream(0));
+            stdout = Some(chan.stream(0));
+            stderr = Some(chan.stderr());
+            channel = Some(chan);
         }
 
-        Ok(buf)
+        Ok(ExecOutput {
+            channel,
+            _stdin: stdin,
+            stdout,
+            stderr,
+        })
     }
 
     /// Closes the underlying session.

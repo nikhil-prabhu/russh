@@ -59,6 +59,46 @@ class AuthMethods:
 
         ...
 
+class ExecOutput:
+    """Represents the output produced when running :func:`SSHClient.exec_command`.
+    """
+
+    def read_stdout(self) -> str:
+        """Reads the contents of the `stdout` stream and consumes it.
+
+        **NOTE**: Future calls will return an empty string.
+
+        Returns:
+            The contents of `stdout`.
+        """
+
+        ...
+
+    def read_stderr(self) -> str:
+        """Reads the contents of the `stderr` stream and consumes it.
+
+        **NOTE**: Future calls will return an empty string.
+
+        Returns:
+            The contents of `stderr`.
+        """
+
+        ...
+
+    def exit_status(self) -> int:
+        """Retrieves the exit status of the command and closes the channel and all streams.
+
+        **NOTE**: Future calls will return 0.
+
+        **NOTE**: Future reads of the `stdout` or `stderr` streams will return empty strings.
+
+        Returns:
+            The exit status.
+        """
+
+        ...
+
+
 class SSHClient:
     """The SSH client.
     """
@@ -92,7 +132,7 @@ class SSHClient:
 
         ...
 
-    def exec_command(self, command: str) -> str:
+    def exec_command(self, command: str) -> ExecOutput:
         """Executes a command using the established session and returns the output.
 
         Args:
@@ -100,7 +140,6 @@ class SSHClient:
 
         Returns:
             The command's output.
-
         """
 
         ...
