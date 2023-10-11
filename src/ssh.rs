@@ -228,7 +228,7 @@ impl SSHClient {
     /// * `username` - The SSH username.
     /// * `auth` - The authentication methods to use.
     /// * `port` The SSH port. Defaults to 22.
-    /// * `timeout` - The connection timeout (in seconds). Defaults to 30.
+    /// * `timeout` - The timeout for the TCP connection (in seconds). Defaults to 30.
     pub fn connect(
         &mut self,
         host: String,
@@ -246,7 +246,6 @@ impl SSHClient {
             .map_err(russh_exception_from_err)?;
 
         let mut sess = Session::new().map_err(russh_exception_from_err)?;
-        sess.set_timeout(timeout * 1000);
         sess.set_tcp_stream(tcp);
         sess.handshake().map_err(russh_exception_from_err)?;
 

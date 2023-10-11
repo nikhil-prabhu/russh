@@ -149,7 +149,7 @@ class SSHClient:
             username (str): The SSH username.
             auth (str): The authentication methods to use.
             port (int, optional): The SSH port. Defaults to 22.
-            timeout (int, optional): The connection timeout (in seconds). Defaults to 30.
+            timeout (int, optional): The timeout for the TCP connection (in seconds). Defaults to 30.
 
         Returns:
             None
