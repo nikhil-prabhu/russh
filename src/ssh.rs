@@ -1,7 +1,7 @@
 //! SSH types and methods.
 
 use std::error::Error;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::Path;
 use std::time::Duration;
@@ -102,8 +102,8 @@ impl AuthMethods {
 /// Represents the output produced when running [`SSHClient::exec_command`].
 pub struct ExecOutput {
     channel: Option<Channel>,
-    /// The `stdin` stream. Currently just a placeholder and is unused.
-    _stdin: Option<Stream>,
+    /// The `stdin` stream.
+    stdin: Option<Stream>,
     /// The `stdout` stream's contents.
     stdout: Option<Stream>,
     /// The `stderr` stream's contents.
@@ -112,11 +112,26 @@ pub struct ExecOutput {
 
 #[pymethods]
 impl ExecOutput {
-    /// Writes the specified data to the `stdin` stream.
+    /// Writes the provided data to the `stdin` stream and closes it.
     ///
-    /// Currently not implemented.
-    fn _write_stdin(&mut self, _data: String) -> PyResult<()> {
-        todo!()
+    /// **NOTE**: Future calls will discard the provided data without doing anything.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The data to write to the stream.
+    pub fn write_stdin(&mut self, data: String) -> PyResult<()> {
+        if let Some(mut stdin) = self.stdin.take() {
+            if let Some(channel) = self.channel.as_mut() {
+                stdin
+                    .write_all(data.as_bytes())
+                    .map_err(russh_exception_from_err)?;
+                stdin.flush().map_err(russh_exception_from_err)?;
+
+                channel.send_eof().map_err(russh_exception_from_err)?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Reads the contents of the `stdout` stream and consumes it.
@@ -261,7 +276,7 @@ impl SSHClient {
 
         Ok(ExecOutput {
             channel,
-            _stdin: stdin,
+            stdin,
             stdout,
             stderr,
         })

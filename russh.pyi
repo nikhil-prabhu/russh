@@ -63,6 +63,20 @@ class ExecOutput:
     """Represents the output produced when running :func:`SSHClient.exec_command`.
     """
 
+    def write_stdin(self, data: str) -> None:
+        """Writes the provided data to the `stdin` stream and closes it.
+
+        **NOTE**: Future calls will discard the provided data without doing anything.
+
+        Args:
+            data (str): The data to write to the stream.
+
+        Returns:
+            None
+        """
+
+        ...
+
     def read_stdout(self) -> str:
         """Reads the contents of the `stdout` stream and consumes it.
 
