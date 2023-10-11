@@ -112,6 +112,17 @@ class ExecOutput:
 
         ...
 
+    def close(self) -> None:
+        """Consumes all streams and closes the underlying channel if it exists and is active.
+
+        If there is no active channel, then this function does nothing.
+
+        Returns:
+            None
+        """
+
+        ...
+
 
 class SSHClient:
     """The SSH client.

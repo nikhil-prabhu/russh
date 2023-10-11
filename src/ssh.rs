@@ -188,6 +188,21 @@ impl ExecOutput {
 
         Ok(exit_status)
     }
+
+    /// Consumes all streams and closes the underlying channel if it exists and is active.
+    ///
+    /// If there is no active channel, then this function does nothing.
+    fn close(&mut self) -> PyResult<()> {
+        self.stdin.take();
+        self.stdout.take();
+        self.stderr.take();
+
+        if let Some(mut channel) = self.channel.take() {
+            channel.close().map_err(russh_exception_from_err)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[pyclass]
