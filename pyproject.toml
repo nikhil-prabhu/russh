@@ -28,3 +28,4 @@ classifiers = [
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+strip = true
