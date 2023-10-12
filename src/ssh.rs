@@ -9,10 +9,10 @@ use std::time::Duration;
 
 use pyo3::exceptions::{
     PyConnectionRefusedError, PyException, PyFileExistsError, PyFileNotFoundError, PyIOError,
-    PyPermissionError,
+    PyPermissionError, PyValueError,
 };
 use pyo3::prelude::*;
-use ssh2::{Channel, ErrorCode, Session, Sftp, Stream};
+use ssh2::{Channel, ErrorCode, OpenFlags, OpenType, Session, Sftp, Stream};
 
 /// Default SSH port.
 const DEFAULT_PORT: u16 = 22;
@@ -388,15 +388,29 @@ impl SFTPClient {
 
     /// Opens a file on the remote server.
     ///
-    /// The opened file is both readable and writable.
-    ///
     /// # Arguments
     ///
     /// * `filename` - The name of the file (if file is in `cwd`) OR the path to the file.
-    pub fn open(&mut self, filename: String) -> PyResult<File> {
+    /// * `mode` - Python-style file mode.
+    pub fn open(&mut self, filename: String, mode: Option<&str>) -> PyResult<File> {
+        let flags = mode.unwrap_or("r");
+        let flags = match flags {
+            "r" => OpenFlags::READ,
+            "r+" => OpenFlags::READ | OpenFlags::WRITE,
+            "w" => OpenFlags::TRUNCATE | OpenFlags::WRITE,
+            "w+" => OpenFlags::WRITE | OpenFlags::TRUNCATE | OpenFlags::READ,
+            "a" => OpenFlags::CREATE | OpenFlags::APPEND,
+            "a+" => OpenFlags::CREATE | OpenFlags::APPEND | OpenFlags::READ | OpenFlags::WRITE,
+            _ => return Err(PyValueError::new_err(format!("invalid mode: '{}'", flags))),
+        };
+
         if let Some(client) = self.client.as_mut() {
             let path = path_from_string(self.cwd.clone(), filename);
-            return Ok(File(client.open(&path).map_err(excp_from_err)?));
+            return Ok(File(
+                client
+                    .open_mode(&path, flags, 0o644, OpenType::File)
+                    .map_err(excp_from_err)?,
+            ));
         }
 
         Err(SFTPException::new_err("SFTP session not open".to_string()))
@@ -409,8 +423,9 @@ impl SFTPClient {
     /// # Arguments
     ///
     /// * `filename` - The name of the file (if the file is in `cwd`) OR the path to the file.
-    pub fn file(&mut self, filename: String) -> PyResult<File> {
-        self.open(filename)
+    /// * `mode` - Python-style file mode.
+    pub fn file(&mut self, filename: String, mode: Option<&str>) -> PyResult<File> {
+        self.open(filename, mode)
     }
 
     /// Copies a file from the remote server to the local host.

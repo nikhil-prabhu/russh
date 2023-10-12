@@ -202,13 +202,27 @@ class SFTPClient:
     def rmdir(self, dir: str) -> None:
         ...
 
-    def open(self, filename: str) -> File:
+    def open(self, filename: str, mode: str = 'r') -> File:
         """Opens a file on the remote server.
-
-        The opened file is both readable and writable.
 
         Args:
             filename (str): The name of the file (if file is in `cwd`) OR the path to the file.
+            mode (str, optional): Python-style file mode. Defaults to 'r'.
+
+        Returns:
+            The opened :class:`File`.
+        """
+
+        ...
+
+    def file(self, filename: str, mode: str = 'r') -> File:
+        """Opens a file on the remote server.
+
+        **NOTE**: This method is just an alias to :func:`SFTPClient.open` to mimic compatibility with paramiko.
+
+        Args:
+            filename (str): The name of the file (if file is in `cwd`) OR the path to the file.
+            mode (str, optional): Python-style file mode. Defaults to 'r'.
 
         Returns:
             The opened :class:`File`.
