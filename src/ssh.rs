@@ -441,11 +441,10 @@ impl SFTPClient {
     /// * `remotepath` - The remote path to copy the file to.
     pub fn put(&mut self, localpath: String, remotepath: String) -> PyResult<()> {
         if let Some(client) = self.client.as_mut() {
-            let remotepath = path_from_string(self.cwd.clone(), remotepath.clone());
-            client.create(&remotepath).map_err(excp_from_err)?;
+            let remotepath = path_from_string(self.cwd.clone(), remotepath);
 
             let content = fs::read_to_string(&localpath).map_err(excp_from_err)?;
-            let mut file = client.open(&remotepath).map_err(excp_from_err)?;
+            let mut file = client.create(&remotepath).map_err(excp_from_err)?;
 
             return Ok(file.write_all(content.as_bytes()).map_err(excp_from_err)?);
         }
