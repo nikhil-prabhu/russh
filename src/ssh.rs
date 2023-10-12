@@ -105,7 +105,6 @@ impl PrivateKeyAuth {
 
 #[pyclass]
 #[derive(Clone)]
-// TODO: Describe the order of priority.
 /// Represents supported authentication methods.
 pub struct AuthMethods {
     /// Password-based authentication method.
@@ -495,6 +494,13 @@ impl SSHClient {
 
     /// Establishes an SSH connection and sets the created session on the client.
     ///
+    /// If multiple authentication methods are specified, then they are all attempted one at a time
+    /// (until one succeeds) in the following order:
+    ///
+    /// [`PasswordAuth`] > [`PrivateKeyAuth`]
+    ///
+    /// If all the authentication methods fail, the error message from the last attempted method is returned.
+    ///
     /// # Arguments
     ///
     /// * `host` - The host name or address.
@@ -520,20 +526,42 @@ impl SSHClient {
         sess.set_tcp_stream(tcp);
         sess.handshake().map_err(excp_from_err)?;
 
+        let mut last_error = None;
+
         if let Some(password) = auth.password {
-            sess.userauth_password(&username, &password.0)
-                .map_err(excp_from_err)?;
-        } else if let Some(private_key) = auth.private_key {
-            sess.userauth_pubkey_file(
-                &username,
-                None,
-                Path::new(&private_key.private_key),
-                private_key.passphrase.as_deref(),
-            )
-            .map_err(excp_from_err)?;
+            if let Err(err) = sess
+                .userauth_password(&username, &password.0)
+                .map_err(excp_from_err)
+            {
+                last_error = Some(err);
+            } else {
+                self.sess = Some(sess);
+
+                return Ok(());
+            }
         }
 
-        self.sess = Some(sess);
+        if let Some(private_key) = auth.private_key {
+            if let Err(err) = sess
+                .userauth_pubkey_file(
+                    &username,
+                    None,
+                    Path::new(&private_key.private_key),
+                    private_key.passphrase.as_deref(),
+                )
+                .map_err(excp_from_err)
+            {
+                last_error = Some(err);
+            } else {
+                self.sess = Some(sess);
+
+                return Ok(());
+            }
+        }
+
+        if let Some(err) = last_error {
+            return Err(err);
+        }
 
         Ok(())
     }

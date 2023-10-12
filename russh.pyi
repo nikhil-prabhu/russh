@@ -295,6 +295,13 @@ class SSHClient:
     ) -> None:
         """Establishes an SSH connection and sets the created session on the client.
 
+        If multiple authentication methods are specified, then they are all attempted one at a time
+        (until one succeeds) in the following order:
+
+        :class:`PasswordAuth` > :class:`PrivateKeyAuth`
+
+        If all the authentication methods fail, the exception from the last attempted method is raised.
+
         Args:
             host (str): The host name or address.
             username (str): The SSH username.
