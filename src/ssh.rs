@@ -2,30 +2,60 @@
 
 use std::error::Error;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{self, ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use pyo3::exceptions::PyException;
+use pyo3::exceptions::{
+    PyConnectionRefusedError, PyException, PyFileExistsError, PyFileNotFoundError, PyIOError,
+    PyPermissionError,
+};
 use pyo3::prelude::*;
-use ssh2::{Channel, Session, Sftp, Stream};
+use ssh2::{Channel, ErrorCode, Session, Sftp, Stream};
 
 /// Default SSH port.
 const DEFAULT_PORT: u16 = 22;
 /// Default connection timeout.
 const DEFAULT_TIMEOUT: u32 = 30;
 
-// Custom Python exception type.
-pyo3::create_exception!(russh, RusshException, PyException);
+// Custom Python exception types.
+pyo3::create_exception!(russh, SessionException, PyException);
+pyo3::create_exception!(russh, SFTPException, PyException);
 
-/// Convenience function to convert a generic error to a [`RusshException`].
+/// Convenience function to map Rust errors to appropriate Python exceptions.
+///
+/// This function can be passed to [`Result::map_err`].
 ///
 /// # Arguments
 ///
-/// * `err` - The error.
-fn russh_exception_from_err<E: Error>(err: E) -> PyErr {
-    RusshException::new_err(err.to_string())
+/// * `err` - The error to convert.
+fn excp_from_err<E>(err: E) -> PyErr
+where
+    E: Error + Send + Sync + 'static,
+{
+    let err: Box<dyn Error> = Box::new(err);
+
+    if let Some(ssh_err) = err.downcast_ref::<ssh2::Error>() {
+        return match ssh_err.code() {
+            ErrorCode::Session(_) => SessionException::new_err(ssh_err.to_string()),
+            ErrorCode::SFTP(_) => SFTPException::new_err(ssh_err.to_string()),
+        };
+    }
+
+    if let Some(io_err) = err.downcast_ref::<io::Error>() {
+        return match io_err.kind() {
+            ErrorKind::AlreadyExists => PyErr::new::<PyFileExistsError, _>(io_err.to_string()),
+            ErrorKind::NotFound => PyErr::new::<PyFileNotFoundError, _>(io_err.to_string()),
+            ErrorKind::PermissionDenied => PyErr::new::<PyPermissionError, _>(io_err.to_string()),
+            ErrorKind::ConnectionRefused => {
+                PyErr::new::<PyConnectionRefusedError, _>(io_err.to_string())
+            }
+            _ => PyErr::new::<PyIOError, _>(io_err.to_string()),
+        };
+    }
+
+    PyErr::new::<PyException, _>(err.to_string())
 }
 
 #[pyclass]
@@ -123,12 +153,10 @@ impl ExecOutput {
     pub fn write_stdin(&mut self, data: String) -> PyResult<()> {
         if let Some(mut stdin) = self.stdin.take() {
             if let Some(channel) = self.channel.as_mut() {
-                stdin
-                    .write_all(data.as_bytes())
-                    .map_err(russh_exception_from_err)?;
-                stdin.flush().map_err(russh_exception_from_err)?;
+                stdin.write_all(data.as_bytes()).map_err(excp_from_err)?;
+                stdin.flush().map_err(excp_from_err)?;
 
-                channel.send_eof().map_err(russh_exception_from_err)?;
+                channel.send_eof().map_err(excp_from_err)?;
             }
         }
 
@@ -142,9 +170,7 @@ impl ExecOutput {
         let mut buf = String::new();
 
         if let Some(mut stdout) = self.stdout.take() {
-            stdout
-                .read_to_string(&mut buf)
-                .map_err(russh_exception_from_err)?;
+            stdout.read_to_string(&mut buf).map_err(excp_from_err)?;
         }
 
         Ok(buf)
@@ -157,9 +183,7 @@ impl ExecOutput {
         let mut buf = String::new();
 
         if let Some(mut stderr) = self.stderr.take() {
-            stderr
-                .read_to_string(&mut buf)
-                .map_err(russh_exception_from_err)?;
+            stderr.read_to_string(&mut buf).map_err(excp_from_err)?;
         }
 
         Ok(buf)
@@ -177,14 +201,13 @@ impl ExecOutput {
             let mut stdout = String::new();
             let mut stderr = String::new();
 
-            chan.read_to_string(&mut stdout)
-                .map_err(russh_exception_from_err)?;
+            chan.read_to_string(&mut stdout).map_err(excp_from_err)?;
             chan.stderr()
                 .read_to_string(&mut stderr)
-                .map_err(russh_exception_from_err)?;
+                .map_err(excp_from_err)?;
 
-            chan.wait_close().map_err(russh_exception_from_err)?;
-            exit_status = chan.exit_status().map_err(russh_exception_from_err)?;
+            chan.wait_close().map_err(excp_from_err)?;
+            exit_status = chan.exit_status().map_err(excp_from_err)?;
         }
 
         Ok(exit_status)
@@ -199,7 +222,7 @@ impl ExecOutput {
         self.stderr.take();
 
         if let Some(mut channel) = self.channel.take() {
-            channel.close().map_err(russh_exception_from_err)?;
+            channel.close().map_err(excp_from_err)?;
         }
 
         Ok(())
@@ -235,9 +258,7 @@ impl File {
     /// Reads and returns the contents of the file.
     pub fn read(&mut self) -> PyResult<String> {
         let mut buf = String::new();
-        self.0
-            .read_to_string(&mut buf)
-            .map_err(russh_exception_from_err)?;
+        self.0.read_to_string(&mut buf).map_err(excp_from_err)?;
 
         Ok(buf)
     }
@@ -248,10 +269,8 @@ impl File {
     ///
     /// * `data` - The data to write to the file.
     pub fn write(&mut self, data: String) -> PyResult<()> {
-        self.0
-            .write_all(data.as_bytes())
-            .map_err(russh_exception_from_err)?;
-        self.0.flush().map_err(russh_exception_from_err)
+        self.0.write_all(data.as_bytes()).map_err(excp_from_err)?;
+        self.0.flush().map_err(excp_from_err)
     }
 }
 #[pyclass]
@@ -284,16 +303,17 @@ impl SFTPClient {
                 let path = Path::new(&path);
 
                 if let Err(_) = client.opendir(path) {
-                    return Err(RusshException::new_err(format!(
-                        "Path {} does not exist on server",
-                        path.display()
-                    )));
+                    return Err(io::Error::new(
+                        ErrorKind::NotFound,
+                        format!("Path {} does not exist on server", path.display()),
+                    ))
+                    .map_err(excp_from_err)?;
                 }
             }
 
             self.cwd = dir;
         } else {
-            return Err(RusshException::new_err("SFTP session not open".to_string()));
+            return Err(SFTPException::new_err("SFTP session not open".to_string()));
         }
 
         Ok(())
@@ -315,12 +335,10 @@ impl SFTPClient {
 
         if let Some(client) = self.client.as_mut() {
             let path = path_from_string(self.cwd.clone(), dir);
-            return Ok(client
-                .mkdir(&path, mode)
-                .map_err(russh_exception_from_err)?);
+            return Ok(client.mkdir(&path, mode).map_err(excp_from_err)?);
         }
 
-        Err(RusshException::new_err("SFTP session not open".to_string()))
+        Err(SFTPException::new_err("SFTP session not open".to_string()))
     }
 
     /// Removes a file from the remote server.
@@ -333,10 +351,10 @@ impl SFTPClient {
     pub fn unlink(&mut self, path: String) -> PyResult<()> {
         if let Some(client) = self.client.as_mut() {
             let path = path_from_string(self.cwd.clone(), path);
-            return Ok(client.unlink(&path).map_err(russh_exception_from_err)?);
+            return Ok(client.unlink(&path).map_err(excp_from_err)?);
         }
 
-        Err(RusshException::new_err("SFTP session not open".to_string()))
+        Err(SFTPException::new_err("SFTP session not open".to_string()))
     }
 
     /// Removes a file from the remote server.
@@ -362,10 +380,10 @@ impl SFTPClient {
     pub fn rmdir(&mut self, dir: String) -> PyResult<()> {
         if let Some(client) = self.client.as_mut() {
             let path = path_from_string(self.cwd.clone(), dir);
-            return Ok(client.rmdir(&path).map_err(russh_exception_from_err)?);
+            return Ok(client.rmdir(&path).map_err(excp_from_err)?);
         }
 
-        Err(RusshException::new_err("SFTP session not open".to_string()))
+        Err(SFTPException::new_err("SFTP session not open".to_string()))
     }
 
     /// Opens a file on the remote server.
@@ -378,10 +396,10 @@ impl SFTPClient {
     pub fn open(&mut self, filename: String) -> PyResult<File> {
         if let Some(client) = self.client.as_mut() {
             let path = path_from_string(self.cwd.clone(), filename);
-            return Ok(File(client.open(&path).map_err(russh_exception_from_err)?));
+            return Ok(File(client.open(&path).map_err(excp_from_err)?));
         }
 
-        Err(RusshException::new_err("SFTP session not open".to_string()))
+        Err(SFTPException::new_err("SFTP session not open".to_string()))
     }
 
     /// Opens a file on the remote server.
@@ -406,14 +424,13 @@ impl SFTPClient {
             let remotepath = path_from_string(self.cwd.clone(), remotepath);
 
             let mut buf = String::new();
-            let mut file = client.open(&remotepath).map_err(russh_exception_from_err)?;
-            file.read_to_string(&mut buf)
-                .map_err(russh_exception_from_err)?;
+            let mut file = client.open(&remotepath).map_err(excp_from_err)?;
+            file.read_to_string(&mut buf).map_err(excp_from_err)?;
 
-            return Ok(fs::write(&localpath, buf).map_err(russh_exception_from_err)?);
+            return Ok(fs::write(&localpath, buf).map_err(excp_from_err)?);
         }
 
-        Err(RusshException::new_err("SFTP session not open".to_string()))
+        Err(SFTPException::new_err("SFTP session not open".to_string()))
     }
 
     /// Copies a local file to the remote server.
@@ -425,19 +442,15 @@ impl SFTPClient {
     pub fn put(&mut self, localpath: String, remotepath: String) -> PyResult<()> {
         if let Some(client) = self.client.as_mut() {
             let remotepath = path_from_string(self.cwd.clone(), remotepath.clone());
-            client
-                .create(&remotepath)
-                .map_err(russh_exception_from_err)?;
+            client.create(&remotepath).map_err(excp_from_err)?;
 
-            let content = fs::read_to_string(&localpath).map_err(russh_exception_from_err)?;
-            let mut file = client.open(&remotepath).map_err(russh_exception_from_err)?;
+            let content = fs::read_to_string(&localpath).map_err(excp_from_err)?;
+            let mut file = client.open(&remotepath).map_err(excp_from_err)?;
 
-            return Ok(file
-                .write_all(content.as_bytes())
-                .map_err(russh_exception_from_err)?);
+            return Ok(file.write_all(content.as_bytes()).map_err(excp_from_err)?);
         }
 
-        Err(RusshException::new_err("SFTP session not open".to_string()))
+        Err(SFTPException::new_err("SFTP session not open".to_string()))
     }
 
     /// Checks if the SFTP session is closed.
@@ -485,19 +498,17 @@ impl SSHClient {
     ) -> PyResult<()> {
         let port = port.unwrap_or(DEFAULT_PORT);
         let timeout = timeout.unwrap_or(DEFAULT_TIMEOUT);
-        let addr: SocketAddr = format!("{host}:{port}")
-            .parse()
-            .map_err(russh_exception_from_err)?;
+        let addr: SocketAddr = format!("{host}:{port}").parse().map_err(excp_from_err)?;
         let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(timeout as u64))
-            .map_err(russh_exception_from_err)?;
+            .map_err(excp_from_err)?;
 
-        let mut sess = Session::new().map_err(russh_exception_from_err)?;
+        let mut sess = Session::new().map_err(excp_from_err)?;
         sess.set_tcp_stream(tcp);
-        sess.handshake().map_err(russh_exception_from_err)?;
+        sess.handshake().map_err(excp_from_err)?;
 
         if let Some(password) = auth.password {
             sess.userauth_password(&username, &password.0)
-                .map_err(russh_exception_from_err)?;
+                .map_err(excp_from_err)?;
         } else if let Some(private_key) = auth.private_key {
             sess.userauth_pubkey_file(
                 &username,
@@ -505,7 +516,7 @@ impl SSHClient {
                 Path::new(&private_key.private_key),
                 private_key.passphrase.as_deref(),
             )
-            .map_err(russh_exception_from_err)?;
+            .map_err(excp_from_err)?;
         }
 
         self.sess = Some(sess);
@@ -518,11 +529,13 @@ impl SSHClient {
     /// Fails if there is no active SSH session (if [`SSHClient::connect`] was not called).
     pub fn open_sftp(&self) -> PyResult<SFTPClient> {
         if let Some(sess) = &self.sess {
-            let client = Some(sess.sftp().map_err(russh_exception_from_err)?);
+            let client = Some(sess.sftp().map_err(excp_from_err)?);
             return Ok(SFTPClient { client, cwd: None });
         }
 
-        Err(RusshException::new_err("No active SSH session".to_string()))
+        Err(SessionException::new_err(
+            "No active SSH session".to_string(),
+        ))
     }
 
     /// Executes a command using the underlying session and returns the output.
@@ -537,8 +550,8 @@ impl SSHClient {
         let mut channel = None;
 
         if let Some(sess) = &self.sess {
-            let mut chan = sess.channel_session().map_err(russh_exception_from_err)?;
-            chan.exec(&command).map_err(russh_exception_from_err)?;
+            let mut chan = sess.channel_session().map_err(excp_from_err)?;
+            chan.exec(&command).map_err(excp_from_err)?;
 
             stdin = Some(chan.stream(0));
             stdout = Some(chan.stream(0));

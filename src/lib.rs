@@ -8,7 +8,8 @@ mod ssh;
 
 #[pymodule]
 fn russh(py: Python<'_>, m: &PyModule) -> PyResult<()> {
-    m.add("RusshException", py.get_type::<RusshException>())?;
+    m.add("SessionException", py.get_type::<SessionException>())?;
+    m.add("SFTPException", py.get_type::<SFTPException>())?;
 
     m.add_class::<PasswordAuth>()?;
     m.add_class::<PrivateKeyAuth>()?;

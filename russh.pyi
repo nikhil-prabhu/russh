@@ -3,11 +3,20 @@
 
 from typing import Optional
 
-class RusshException(Exception):
-    """Custom exception type for all `russh` errors.
+
+class SessionException(Exception):
+    """Errors with the SSH session. Could be thrown by either SSH or SFTP operations.
     """
 
     ...
+
+
+class SFTPException(Exception):
+    """SFTP operation errors.
+    """
+
+    ...
+
 
 class PasswordAuth:
     """Represents password based authentication.
@@ -58,6 +67,7 @@ class AuthMethods:
         """
 
         ...
+
 
 class ExecOutput:
     """Represents the output produced when running :func:`SSHClient.exec_command`.
@@ -148,6 +158,7 @@ class File:
         """
 
         ...
+
 
 class SFTPClient:
     """The SFTP client.
@@ -249,6 +260,7 @@ class SFTPClient:
 
         ...
 
+
 class SSHClient:
     """The SSH client.
     """
@@ -292,6 +304,7 @@ class SSHClient:
         """
 
         ...
+
     def exec_command(self, command: str) -> ExecOutput:
         """Executes a command using the established session and returns the output.
 
