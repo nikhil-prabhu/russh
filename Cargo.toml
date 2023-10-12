@@ -17,5 +17,5 @@ crate-type = ["cdylib"]
 ssh2 = "0.9.4"
 
 [dependencies.pyo3]
-version = "0.19.2"
+version = "0.20.0"
 features = ["abi3-py37", "extension-module"]
