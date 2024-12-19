@@ -3,7 +3,7 @@ name = "russh"
 version = "0.5.0"
 edition = "2021"
 authors = ["Nikhil Prabhu <nikhilprabhu98@gmail.com>"]
-license = "MIT"
+license = "GPL-3"
 repository = "https://github.com/nikhil-prabhu/russh"
 keywords = ["pyo3", "python", "ssh"]
 
@@ -13,9 +13,8 @@ maintenance = { status = "experimental" }
 [lib]
 crate-type = ["cdylib"]
 
-[dependencies]
-ssh2 = "0.9.4"
+[profile.release]
+strip = true
 
-[dependencies.pyo3]
-version = "0.20.0"
-features = ["abi3-py37", "extension-module"]
+[dependencies]
+pyo3 = { version = "0.23.3", features = ["extension-module"] }

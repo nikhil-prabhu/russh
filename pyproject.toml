@@ -4,8 +4,10 @@ build-backend = "maturin"
 
 [project]
 name = "russh"
+version = "0.5.0"
+description = "Fast, efficient, and easy-to-use Python SSH client library"
 requires-python = ">=3.7"
-license = "MIT"
+license = { text = "GPL-3.0-only" }
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python",
@@ -19,11 +21,23 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
     "Intended Audience :: Developers",
+]
+
+[tool.hatch.metadata]
+requires-python = ">=3.7"
+
+[tool.hatch.build.targets.wheel]
+args = ["--release"]
+
+[tool.hatch.envs.default]
+description = "The default development environment"
+dependencies = [
+    "maturin>=1.0,<2.0",
 ]
 
 [tool.maturin]
